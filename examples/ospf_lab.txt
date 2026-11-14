@@ -1,0 +1,12 @@
+# Multi-Router OSPF Lab
+# Topology:
+#   R1 has direct links to PC1 and PC2, plus an uplink to SW1.
+#   SW1 connects PC3 and connects to R2.
+#   R2 has direct links to PC4 and PC5.
+
+R1 connects to PC1, PC2 and SW1.
+SW1 connects to PC3 and R2.
+R2 connects to PC4 and PC5.
+
+Use OSPF.
+Automatically assign IP addresses and subnet masks.

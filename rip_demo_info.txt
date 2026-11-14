@@ -1,0 +1,75 @@
+==============================================================================
+        CISCO PACKET TRACER TOPOLOGY & ADDRESSING SPECIFICATION
+==============================================================================
+Project File     : rip_demo.pkt
+Routing Protocol : RIP
+Total Devices    : 8
+Total Cables     : 7
+Broadcast Domains: 3
+==============================================================================
+
+1. COMPLETE DEVICE ADDRESSING TABLE
+------------------------------------------------------------------------------
+Device     Interface              IP Address         Subnet Mask        Gateway           
+------------------------------------------------------------------------------
+R1         GigabitEthernet0/1     192.168.0.1        255.255.255.248    N/A (Router)      
+R1         GigabitEthernet0/0     192.168.0.17       255.255.255.252    N/A (Router)      
+R2         GigabitEthernet0/1     192.168.0.9        255.255.255.248    N/A (Router)      
+R2         GigabitEthernet0/0     192.168.0.18       255.255.255.252    N/A (Router)      
+SW1        Vlan1 (Unmanaged)      Unassigned         Unassigned         N/A (Layer 2)     
+SW2        Vlan1 (Unmanaged)      Unassigned         Unassigned         N/A (Layer 2)     
+PC1        FastEthernet0          192.168.0.2        255.255.255.248    192.168.0.1       
+PC2        FastEthernet0          192.168.0.3        255.255.255.248    192.168.0.1       
+PC3        FastEthernet0          192.168.0.10       255.255.255.248    192.168.0.9       
+PC4        FastEthernet0          192.168.0.11       255.255.255.248    192.168.0.9       
+------------------------------------------------------------------------------
+
+2. PHYSICAL CABLING & PORT CONNECTIONS
+------------------------------------------------------------------------------
+From Device    From Port              To Device      To Port                Cable Type  
+------------------------------------------------------------------------------
+R1             GigabitEthernet0/0     R2             GigabitEthernet0/0     Copper CrossOver
+PC2            FastEthernet0          SW1            FastEthernet0/1        Copper CrossOver
+R2             GigabitEthernet0/1     SW2            FastEthernet0/1        Copper CrossOver
+PC1            FastEthernet0          SW1            FastEthernet0/2        Copper CrossOver
+PC4            FastEthernet0          SW2            FastEthernet0/2        Copper CrossOver
+PC3            FastEthernet0          SW2            FastEthernet0/3        Copper CrossOver
+R1             GigabitEthernet0/1     SW1            FastEthernet0/3        Copper CrossOver
+------------------------------------------------------------------------------
+
+3. VLSM SUBNET ALLOCATION TABLE
+------------------------------------------------------------------------------
+Subnet (CIDR)        Netmask            Connected Routers    Connected PCs       
+------------------------------------------------------------------------------
+192.168.0.0/29       255.255.255.248    R1                   PC1, PC2            
+192.168.0.8/29       255.255.255.248    R2                   PC3, PC4            
+192.168.0.16/30      255.255.255.252    R1, R2               None                
+------------------------------------------------------------------------------
+
+4. ROUTING CONFIGURATION
+------------------------------------------------------------------------------
+Protocol: RIPv2 (version 2, no auto-summary)
+
+[Router R1]
+  network 192.168.0.0
+  network 192.168.0.16
+
+[Router R2]
+  network 192.168.0.8
+  network 192.168.0.16
+------------------------------------------------------------------------------
+
+5. STEP-BY-STEP TESTING & VERIFICATION GUIDE IN PACKET TRACER
+------------------------------------------------------------------------------
+1. Open the .pkt file in Cisco Packet Tracer.
+2. CRITICAL - BYPASS INITIAL CONVERGENCE:
+   - When Packet Tracer first opens, switch ports take 30-50s to transition from STP listening
+     to forwarding (amber dots turn green), and OSPF routers take ~40s to elect DR/BDR.
+   - Click the 'Fast Forward Time' button (>>) in the bottom toolbar 2 to 3 times (or press Alt+D).
+   - Verify all link lights turn solid green.
+3. TESTING CONNECTIVITY:
+   - Click on any PC (e.g. PC1) -> 'Desktop' tab -> 'Command Prompt'.
+   - To test end-to-end ping from PC1 to PC4:
+       ping 192.168.0.11
+   - Note: The first ping packet may timeout due to ARP discovery; packets 2-4 will reply 100%.
+==============================================================================

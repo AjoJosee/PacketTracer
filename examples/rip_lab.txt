@@ -1,0 +1,13 @@
+# Multi-Router RIPv2 Lab
+# Topology:
+#   R1 has a LAN with SW1 (serving PC1 and PC2).
+#   R1 connects to R2 via a point-to-point link.
+#   R2 has a LAN with SW2 (serving PC3 and PC4).
+
+R1 connects to SW1
+SW1 connects to PC1 and PC2
+R1 connects to R2
+R2 connects to SW2
+SW2 connects to PC3 and PC4
+
+Use RIP.

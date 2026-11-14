@@ -1,0 +1,11 @@
+# Static Routing Lab
+# Topology:
+#   R1 has a LAN with PC1.
+#   R1 connects to R2.
+#   R2 has a LAN with PC2.
+
+R1 connects to PC1
+R1 connects to R2
+R2 connects to PC2
+
+Use static.
