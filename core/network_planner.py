@@ -46,7 +46,7 @@ class PlannedNetwork:
 
 
 class NetworkPlanner:
-    def __init__(self, base_network: str = "192.168.0.0/16", routing_protocol: str = "ospf", vlsm: bool = True):
+    def __init__(self, base_network: str = "192.168.0.0/16", routing_protocol: str = "ospf", vlsm: bool = False):
         self.base_network = ipaddress.IPv4Network(base_network, strict=False)
         self.routing_protocol = routing_protocol.lower()
         self.vlsm = vlsm
@@ -111,54 +111,87 @@ class NetworkPlanner:
 
                 domain_list.append(bd)
 
-        # 3. VLSM Subnet Allocation
-        # Sort domains by required host count descending
-        sorted_domains = sorted(domain_list, key=lambda d: d.required_hosts, reverse=True)
+        # 3. Subnet Allocation
+        # Sort domains deterministically so IP allocation is intuitive and consecutive
+        def domain_sort_key(bd: BroadcastDomain):
+            routers = sorted([r for r, _ in bd.router_connections])
+            pcs = sorted(list(bd.pcs))
+            switches = sorted(list(bd.switches))
+            r_key = routers[0] if routers else "ZZZ"
+            is_lan = 0 if (pcs or switches) else 1  # LANs before WANs
+            other_key = (pcs[0] if pcs else (routers[1] if len(routers) > 1 else (switches[0] if switches else "")))
+            return (r_key, is_lan, other_key)
 
-        current_ip = int(self.base_network.network_address)
-        max_ip = int(self.base_network.broadcast_address)
+        sorted_domains = sorted(domain_list, key=domain_sort_key)
 
-        for bd in sorted_domains:
-            needed = max(bd.required_hosts, 2)
-            if self.vlsm:
-                # Find smallest subnet (largest prefix) that fits needed hosts
+        if not self.vlsm:
+            # Simple, consecutive /24 subnets with standard mask 255.255.255.0
+            parts = str(self.base_network.network_address).split(".")
+            prefix_2 = f"{parts[0]}.{parts[1]}"
+            subnet_idx = 1
+
+            for bd in sorted_domains:
+                sub = ipaddress.IPv4Network(f"{prefix_2}.{subnet_idx}.0/24")
+                bd.subnet = sub
+                subnet_idx += 1
+
+                usable_hosts = list(sub.hosts())
+                host_idx = 0
+
+                # Router IPs: .1 for first router (gateway), .2 for second router if point-to-point
+                routers = sorted(list({r for r, _ in bd.router_connections}))
+                for r_name in routers:
+                    r_ip = str(usable_hosts[host_idx])
+                    host_idx += 1
+                    bd.allocated_ips[r_name] = r_ip
+                    if bd.gateway_ip is None:
+                        bd.gateway_ip = r_ip
+
+                # PC IPs: consecutive (.2, .3... or .3, .4... if two routers)
+                for pc_name in sorted(bd.pcs):
+                    pc_ip = str(usable_hosts[host_idx])
+                    host_idx += 1
+                    bd.allocated_ips[pc_name] = pc_ip
+        else:
+            # Traditional VLSM with variable length masks (/30, /29, etc.)
+            vlsm_domains = sorted(domain_list, key=lambda d: d.required_hosts, reverse=True)
+            current_ip = int(self.base_network.network_address)
+            max_ip = int(self.base_network.broadcast_address)
+
+            for bd in vlsm_domains:
+                needed = max(bd.required_hosts, 2)
                 prefix = 24
                 for p in range(30, 20, -1):
                     if (2 ** (32 - p)) - 2 >= needed:
                         prefix = p
                         break
-            else:
-                prefix = 24 if needed > 2 else 30
 
-            step = 2 ** (32 - prefix)
-            # Align current_ip to subnet boundary
-            if current_ip % step != 0:
-                current_ip += step - (current_ip % step)
+                step = 2 ** (32 - prefix)
+                if current_ip % step != 0:
+                    current_ip += step - (current_ip % step)
+                if current_ip + step > max_ip:
+                    raise ValueError(f"Exhausted IP address space in {self.base_network}!")
 
-            if current_ip + step > max_ip:
-                raise ValueError(f"Exhausted IP address space in {self.base_network}!")
+                sub = ipaddress.IPv4Network((current_ip, prefix))
+                bd.subnet = sub
+                current_ip += step
 
-            sub = ipaddress.IPv4Network((current_ip, prefix))
-            bd.subnet = sub
-            current_ip += step
+                usable_hosts = list(sub.hosts())
+                host_idx = 0
 
-            # Assign IP addresses within this subnet
-            usable_hosts = list(sub.hosts())
-            host_idx = 0
+                routers = sorted(list({r for r, _ in bd.router_connections}))
+                for r_name in routers:
+                    r_ip = str(usable_hosts[host_idx])
+                    host_idx += 1
+                    bd.allocated_ips[r_name] = r_ip
+                    if bd.gateway_ip is None:
+                        bd.gateway_ip = r_ip
 
-            # First IPs to routers
-            for r_name, _ in bd.router_connections:
-                r_ip = str(usable_hosts[host_idx])
-                host_idx += 1
-                bd.allocated_ips[r_name] = r_ip
-                if bd.gateway_ip is None:
-                    bd.gateway_ip = r_ip
-
-            # Next IPs to PCs
-            for pc_name in sorted(bd.pcs):
-                pc_ip = str(usable_hosts[host_idx])
-                host_idx += 1
-                bd.allocated_ips[pc_name] = pc_ip
+                for pc_name in sorted(bd.pcs):
+                    pc_ip = str(usable_hosts[host_idx])
+                    host_idx += 1
+                    bd.allocated_ips[pc_name] = pc_ip
+            sorted_domains = vlsm_domains
 
         planned.domains = sorted_domains
 

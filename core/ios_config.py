@@ -17,6 +17,18 @@ def calculate_wildcard_mask(netmask_str: str) -> str:
     return str(ipaddress.IPv4Address(wildcard_int))
 
 
+def get_classful_network(ip_str: str) -> str:
+    """Returns the classful major network address required by Cisco IOS RIP."""
+    parts = ip_str.split(".")
+    first_octet = int(parts[0])
+    if first_octet < 128:       # Class A
+        return f"{parts[0]}.0.0.0"
+    elif first_octet < 192:     # Class B
+        return f"{parts[0]}.{parts[1]}.0.0"
+    else:                       # Class C
+        return f"{parts[0]}.{parts[1]}.{parts[2]}.0"
+
+
 def generate_router_ios_config(router_name: str, planned: PlannedNetwork) -> List[str]:
     """Generates sequential Cisco IOS commands for a router."""
     lines: List[str] = [
@@ -70,14 +82,13 @@ def generate_router_ios_config(router_name: str, planned: PlannedNetwork) -> Lis
         lines.append(" version 2")
         lines.append(" no auto-summary")
 
-        # Add network statements
+        # Add network statements using valid classful networks
         networks_added = set()
         for iface in interfaces:
-            net = ipaddress.IPv4Network(f"{iface.ip}/{iface.mask}", strict=False)
-            net_str = str(net.network_address)
-            if net_str not in networks_added:
-                networks_added.add(net_str)
-                lines.append(f" network {net_str}")
+            classful_net = get_classful_network(iface.ip)
+            if classful_net not in networks_added:
+                networks_added.add(classful_net)
+                lines.append(f" network {classful_net}")
         lines.append("!")
 
     elif proto == "static":

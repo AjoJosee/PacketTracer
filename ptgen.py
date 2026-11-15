@@ -41,7 +41,7 @@ def print_banner():
     print(banner.strip())
 
 
-def generate_pkt(text: str, output_path: str, base_net: str = "192.168.0.0/16", vlsm: bool = True, verbose: bool = True) -> str:
+def generate_pkt(text: str, output_path: str, base_net: str = "192.168.0.0/16", vlsm: bool = False, verbose: bool = True) -> str:
     # 1. Parse network description
     parsed: ParsedNetwork = parse_network_text(text)
     if not parsed.devices:
@@ -273,7 +273,7 @@ def main():
     parser.add_argument("-i", "--input", help="Path to input text file containing network description")
     parser.add_argument("-o", "--output", default="output.pkt", help="Path to output .pkt file (default: output.pkt)")
     parser.add_argument("--base", default="192.168.0.0/16", help="Base IP network for allocation (default: 192.168.0.0/16)")
-    parser.add_argument("--no-vlsm", action="store_true", help="Disable VLSM and use standard /24 subnets for LANs")
+    parser.add_argument("--vlsm", action="store_true", help="Enable VLSM (default is simple consecutive /24 subnets)")
     parser.add_argument("-q", "--quiet", action="store_true", help="Quiet mode (suppress summary output)")
 
     args = parser.parse_args()
@@ -289,7 +289,7 @@ def main():
             if not content:
                 parser.print_help()
                 return
-            generate_pkt(content, args.output, base_net=args.base, vlsm=not args.no_vlsm, verbose=not args.quiet)
+            generate_pkt(content, args.output, base_net=args.base, vlsm=args.vlsm, verbose=not args.quiet)
             return
 
     # Determine text source
@@ -302,7 +302,7 @@ def main():
     else:
         content = args.text
 
-    generate_pkt(content, args.output, base_net=args.base, vlsm=not args.no_vlsm, verbose=not args.quiet)
+    generate_pkt(content, args.output, base_net=args.base, vlsm=args.vlsm, verbose=not args.quiet)
 
 
 if __name__ == "__main__":
