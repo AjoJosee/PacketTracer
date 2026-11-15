@@ -30,6 +30,7 @@ if BASE_DIR not in sys.path:
 from core.parser import parse_network_text, ParsedNetwork
 from core.network_planner import NetworkPlanner, PlannedNetwork
 from core.builder import PacketTracerBuilder
+from core.ios_config import get_classful_network
 
 
 def print_banner():
@@ -151,10 +152,12 @@ def generate_info_text(planned: PlannedNetwork, pkt_path: str) -> str:
         lines.append("Protocol: RIPv2 (version 2, no auto-summary)")
         for r in sorted(routers):
             lines.append(f"\n[Router {r}]")
-            for bd in planned.domains:
-                for cr, _ in bd.router_connections:
-                    if cr == r:
-                        lines.append(f"  network {bd.subnet.network_address}")
+            seen_nets = set()
+            for iface in planned.router_interfaces.get(r, []):
+                c_net = get_classful_network(iface.ip)
+                if c_net not in seen_nets:
+                    seen_nets.add(c_net)
+                    lines.append(f"  network {c_net}")
     elif planned.routing_protocol == "static":
         lines.append("Protocol: Static Routing")
         for r, routes in planned.static_routes.items():

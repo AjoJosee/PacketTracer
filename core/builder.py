@@ -113,7 +113,7 @@ class PacketTracerBuilder:
         rack_slot_idx = 1
         pc_idx = 0
 
-        for dev_name, dev_type in planned.devices.items():
+        for dev_idx, (dev_name, dev_type) in enumerate(planned.devices.items(), start=1):
             x, y = coords[dev_name]
             save_id = save_ids[dev_name]
             dev_guid = device_guids[dev_name]
@@ -122,7 +122,7 @@ class PacketTracerBuilder:
                 dev_elem = copy.deepcopy(router_tmpl)
                 slot_x = 4 * rack_slot_idx
                 rack_slot_idx += 1
-                self._configure_router_element(dev_elem, dev_name, save_id, dev_guid, x, y, slot_x, planned)
+                self._configure_router_element(dev_elem, dev_name, save_id, dev_guid, x, y, slot_x, dev_idx, planned)
                 if rack_children is not None:
                     rack_children.append(self._create_physical_node(dev_name, dev_guid, slot_x, 0))
 
@@ -130,7 +130,7 @@ class PacketTracerBuilder:
                 dev_elem = copy.deepcopy(switch_tmpl)
                 slot_x = 4 * rack_slot_idx
                 rack_slot_idx += 1
-                self._configure_switch_element(dev_elem, dev_name, save_id, dev_guid, x, y, slot_x)
+                self._configure_switch_element(dev_elem, dev_name, save_id, dev_guid, x, y, slot_x, dev_idx)
                 if rack_children is not None:
                     rack_children.append(self._create_physical_node(dev_name, dev_guid, slot_x, 0))
 
@@ -138,7 +138,7 @@ class PacketTracerBuilder:
                 dev_elem = copy.deepcopy(pc_tmpl)
                 pc_phys_x = 86 + 40 * pc_idx
                 pc_idx += 1
-                self._configure_pc_element(dev_elem, dev_name, save_id, dev_guid, x, y, pc_phys_x, 215, planned)
+                self._configure_pc_element(dev_elem, dev_name, save_id, dev_guid, x, y, pc_phys_x, 215, dev_idx, planned)
                 if office_children is not None:
                     office_children.append(self._create_physical_node(dev_name, dev_guid, pc_phys_x, 215))
 
@@ -250,7 +250,7 @@ class PacketTracerBuilder:
                 el = ET.SubElement(cpur, tag)
             el.text = val
 
-    def _configure_router_element(self, dev_elem: ET.Element, name: str, save_id: str, guid: str, x: float, y: float, slot_x: int, planned: PlannedNetwork):
+    def _configure_router_element(self, dev_elem: ET.Element, name: str, save_id: str, guid: str, x: float, y: float, slot_x: int, dev_idx: int, planned: PlannedNetwork):
         name_elem = dev_elem.find(".//ENGINE/NAME")
         if name_elem is not None:
             name_elem.text = name
@@ -275,6 +275,69 @@ class PacketTracerBuilder:
         self._set_physical_path(dev_elem, f"{GUID_INTERCITY},{GUID_CITY},{GUID_OFFICE},{GUID_CLOSET},{GUID_RACK},{guid}")
         self._set_physical_cpur(dev_elem, f"{GUID_INTERCITY},{GUID_CITY},{GUID_OFFICE},{GUID_CLOSET}", GUID_RACK, slot_x, 0, x_pn="0.154", y_pn="0.11675")
 
+        # Hardware Port Configuration
+        port_map = {
+            "GigabitEthernet0/0": 0,
+            "GigabitEthernet0/1": 1,
+            "GigabitEthernet0/2": 2,
+        }
+        ports = dev_elem.findall(".//PORT")
+        iface_by_port = {iface.port: iface for iface in planned.router_interfaces.get(name, [])}
+
+        for p_name, p_idx in port_map.items():
+            if p_idx < len(ports):
+                port_elem = ports[p_idx]
+                mac_str = f"0060.2F{dev_idx:02X}.0{p_idx+1:03X}"
+                mac_elem = port_elem.find("MACADDRESS")
+                if mac_elem is not None:
+                    mac_elem.text = mac_str
+                bia_elem = port_elem.find("BIA")
+                if bia_elem is not None:
+                    bia_elem.text = mac_str
+
+                if p_name in iface_by_port:
+                    iface = iface_by_port[p_name]
+                    # Power on the port and bind IP/Subnet in simulation engine
+                    p_power = port_elem.find("POWER")
+                    if p_power is not None:
+                        p_power.text = "true"
+
+                    up_elem = port_elem.find("UP_METHOD")
+                    if up_elem is None:
+                        up_elem = ET.SubElement(port_elem, "UP_METHOD")
+                    up_elem.text = "3"
+
+                    p_ip = port_elem.find("IP")
+                    if p_ip is None:
+                        p_ip = ET.SubElement(port_elem, "IP")
+                    p_ip.text = iface.ip
+
+                    p_sub = port_elem.find("SUBNET")
+                    if p_sub is None:
+                        p_sub = ET.SubElement(port_elem, "SUBNET")
+                    p_sub.text = iface.mask
+
+                    full_dup = port_elem.find("FULLDUPLEX")
+                    if full_dup is not None:
+                        full_dup.text = "true"
+
+                    speed_elem = port_elem.find("SPEED")
+                    if speed_elem is None:
+                        speed_elem = ET.SubElement(port_elem, "SPEED")
+                    speed_elem.text = "1000"
+
+                    ipv6_ll = port_elem.find("IPV6_DEFAULT_LINK_LOCAL")
+                    if ipv6_ll is not None:
+                        ipv6_ll.text = f"FE80::260:2FFF:FE{dev_idx:02X}:{p_idx+1:04X}"
+                else:
+                    p_power = port_elem.find("POWER")
+                    if p_power is not None:
+                        p_power.text = "false"
+                    up_elem = port_elem.find("UP_METHOD")
+                    if up_elem is None:
+                        up_elem = ET.SubElement(port_elem, "UP_METHOD")
+                    up_elem.text = "5"
+
         # Cisco IOS running-config
         ios_lines = generate_router_ios_config(name, planned)
         rc_elem = dev_elem.find(".//ENGINE/RUNNINGCONFIG")
@@ -291,7 +354,7 @@ class PacketTracerBuilder:
                 line_elem = ET.SubElement(sc_elem, "LINE")
                 line_elem.text = line
 
-    def _configure_switch_element(self, dev_elem: ET.Element, name: str, save_id: str, guid: str, x: float, y: float, slot_x: int):
+    def _configure_switch_element(self, dev_elem: ET.Element, name: str, save_id: str, guid: str, x: float, y: float, slot_x: int, dev_idx: int):
         name_elem = dev_elem.find(".//ENGINE/NAME")
         if name_elem is not None:
             name_elem.text = name
@@ -311,6 +374,16 @@ class PacketTracerBuilder:
         self._set_physical_path(dev_elem, f"{GUID_INTERCITY},{GUID_CITY},{GUID_OFFICE},{GUID_CLOSET},{GUID_RACK},{guid}")
         self._set_physical_cpur(dev_elem, f"{GUID_INTERCITY},{GUID_CITY},{GUID_OFFICE},{GUID_CLOSET}", GUID_RACK, slot_x, 0, x_pn="0.03225", y_pn="0.0355")
 
+        # Unique MAC addresses for switch ports
+        for s_idx, port_elem in enumerate(dev_elem.findall(".//PORT")):
+            mac_str = f"000A.41{dev_idx:02X}.{s_idx+1:04X}"
+            mac_elem = port_elem.find("MACADDRESS")
+            if mac_elem is not None:
+                mac_elem.text = mac_str
+            bia_elem = port_elem.find("BIA")
+            if bia_elem is not None:
+                bia_elem.text = mac_str
+
         ios_lines = generate_switch_ios_config(name)
         rc_elem = dev_elem.find(".//ENGINE/RUNNINGCONFIG")
         if rc_elem is not None:
@@ -319,7 +392,7 @@ class PacketTracerBuilder:
                 line_elem = ET.SubElement(rc_elem, "LINE")
                 line_elem.text = line
 
-    def _configure_pc_element(self, dev_elem: ET.Element, name: str, save_id: str, guid: str, x: float, y: float, phys_x: int, phys_y: int, planned: PlannedNetwork):
+    def _configure_pc_element(self, dev_elem: ET.Element, name: str, save_id: str, guid: str, x: float, y: float, phys_x: int, phys_y: int, dev_idx: int, planned: PlannedNetwork):
         name_elem = dev_elem.find(".//ENGINE/NAME")
         if name_elem is not None:
             name_elem.text = name
@@ -339,21 +412,74 @@ class PacketTracerBuilder:
         self._set_physical_path(dev_elem, f"{GUID_INTERCITY},{GUID_CITY},{GUID_OFFICE},{guid}")
         self._set_physical_cpur(dev_elem, f"{GUID_INTERCITY},{GUID_CITY},{GUID_OFFICE}", GUID_OFFICE, phys_x, phys_y, x_pn="0.024971", y_pn="0.100561")
 
-        iface = planned.pc_interfaces.get(name)
-        if iface:
-            ip_elem = dev_elem.find(".//IP")
-            subnet_elem = dev_elem.find(".//SUBNET")
-            gw_elem = dev_elem.find(".//PORT_GATEWAY")
-            dhcp_elem = dev_elem.find(".//PORT_DHCP_ENABLE")
+        # Hardware Port Configuration
+        ports = dev_elem.findall(".//PORT")
+        if ports:
+            port0 = ports[0]
+            mac_str = f"0030.F2{dev_idx:02X}.0001"
+            mac_elem = port0.find("MACADDRESS")
+            if mac_elem is not None:
+                mac_elem.text = mac_str
+            bia_elem = port0.find("BIA")
+            if bia_elem is not None:
+                bia_elem.text = mac_str
 
-            if ip_elem is not None and iface.ip:
+            p_power = port0.find("POWER")
+            if p_power is not None:
+                p_power.text = "true"
+
+            up_elem = port0.find("UP_METHOD")
+            if up_elem is None:
+                up_elem = ET.SubElement(port0, "UP_METHOD")
+            up_elem.text = "5"
+
+            full_dup = port0.find("FULLDUPLEX")
+            if full_dup is not None:
+                full_dup.text = "true"
+
+            iface = planned.pc_interfaces.get(name)
+            if iface:
+                ip_elem = port0.find("IP")
+                if ip_elem is None:
+                    ip_elem = ET.SubElement(port0, "IP")
                 ip_elem.text = iface.ip
-            if subnet_elem is not None and iface.mask:
-                subnet_elem.text = iface.mask
-            if gw_elem is not None and iface.gateway:
+
+                sub_elem = port0.find("SUBNET")
+                if sub_elem is None:
+                    sub_elem = ET.SubElement(port0, "SUBNET")
+                sub_elem.text = iface.mask
+
+                gw_elem = port0.find("PORT_GATEWAY")
+                if gw_elem is None:
+                    gw_elem = ET.SubElement(port0, "PORT_GATEWAY")
                 gw_elem.text = iface.gateway
-            if dhcp_elem is not None:
+
+                dhcp_elem = port0.find("PORT_DHCP_ENABLE")
+                if dhcp_elem is None:
+                    dhcp_elem = ET.SubElement(port0, "PORT_DHCP_ENABLE")
                 dhcp_elem.text = "false"
+
+                gw_engine = dev_elem.find(".//ENGINE/GATEWAY")
+                if gw_engine is None:
+                    engine_node = dev_elem.find("ENGINE")
+                    if engine_node is not None:
+                        gw_engine = ET.SubElement(engine_node, "GATEWAY")
+                if gw_engine is not None:
+                    gw_engine.text = iface.gateway
+
+                ipv6_ll = port0.find("IPV6_DEFAULT_LINK_LOCAL")
+                if ipv6_ll is not None:
+                    ipv6_ll.text = f"FE80::230:F2FF:FE{dev_idx:02X}:0001"
+
+        if len(ports) > 1:
+            port1 = ports[1]
+            mac_str_bt = f"0060.5C{dev_idx:02X}.0002"
+            mac_elem = port1.find("MACADDRESS")
+            if mac_elem is not None:
+                mac_elem.text = mac_str_bt
+            bia_elem = port1.find("BIA")
+            if bia_elem is not None:
+                bia_elem.text = mac_str_bt
 
     def _create_physical_node(self, name: str, guid: str, x: int, y: int) -> ET.Element:
         """Constructs a valid <NODE> inside the Physical Workspace hierarchy."""
@@ -401,7 +527,7 @@ class PacketTracerBuilder:
         ET.SubElement(link, "TYPE").text = "eCopper"
 
         cable = ET.SubElement(link, "CABLE")
-        ET.SubElement(cable, "LENGTH").text = "0"
+        ET.SubElement(cable, "LENGTH").text = "1"
         ET.SubElement(cable, "FUNCTIONAL").text = "true"
         ET.SubElement(cable, "FROM").text = from_save_id
         ET.SubElement(cable, "PORT").text = from_port

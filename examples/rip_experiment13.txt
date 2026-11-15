@@ -1,0 +1,12 @@
+# Experiment 13: Multi-Router RIPv2 Routing Lab (from RIPv2_Routing.docx)
+# Topology:
+#   R2621 connects to R2501A
+#   R2501A connects to R2501B
+#   R2501B connects to PC and R2501C
+
+R2621 connects to R2501A
+R2501A connects to R2501B
+R2501B connects to PC and R2501C
+
+Use RIP.
+Base: 172.16.0.0/16

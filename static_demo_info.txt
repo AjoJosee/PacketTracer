@@ -12,8 +12,8 @@ Broadcast Domains: 3
 ------------------------------------------------------------------------------
 Device     Interface              IP Address         Subnet Mask        Gateway           
 ------------------------------------------------------------------------------
-R1         GigabitEthernet0/0     192.168.1.1        255.255.255.0      N/A (Router)      
-R1         GigabitEthernet0/1     192.168.2.1        255.255.255.0      N/A (Router)      
+R1         GigabitEthernet0/1     192.168.1.1        255.255.255.0      N/A (Router)      
+R1         GigabitEthernet0/0     192.168.2.1        255.255.255.0      N/A (Router)      
 R2         GigabitEthernet0/0     192.168.2.2        255.255.255.0      N/A (Router)      
 R2         GigabitEthernet0/1     192.168.3.1        255.255.255.0      N/A (Router)      
 PC1        FastEthernet0          192.168.1.2        255.255.255.0      192.168.1.1       
@@ -24,8 +24,8 @@ PC2        FastEthernet0          192.168.3.2        255.255.255.0      192.168.
 ------------------------------------------------------------------------------
 From Device    From Port              To Device      To Port                Cable Type  
 ------------------------------------------------------------------------------
-PC1            FastEthernet0          R1             GigabitEthernet0/0     Cross-Over      
-R1             GigabitEthernet0/1     R2             GigabitEthernet0/0     Cross-Over      
+R1             GigabitEthernet0/0     R2             GigabitEthernet0/0     Cross-Over      
+PC1            FastEthernet0          R1             GigabitEthernet0/1     Cross-Over      
 PC2            FastEthernet0          R2             GigabitEthernet0/1     Cross-Over      
 ------------------------------------------------------------------------------
 

@@ -1,0 +1,72 @@
+==============================================================================
+        CISCO PACKET TRACER TOPOLOGY & ADDRESSING SPECIFICATION
+==============================================================================
+Project File     : rip_experiment13.pkt
+Routing Protocol : RIP
+Total Devices    : 5
+Total Cables     : 4
+Broadcast Domains: 4
+==============================================================================
+
+1. COMPLETE DEVICE ADDRESSING TABLE
+------------------------------------------------------------------------------
+Device     Interface              IP Address         Subnet Mask        Gateway           
+------------------------------------------------------------------------------
+R2501A     GigabitEthernet0/1     172.16.1.1         255.255.255.0      N/A (Router)      
+R2501A     GigabitEthernet0/0     172.16.2.1         255.255.255.0      N/A (Router)      
+R2501B     GigabitEthernet0/1     172.16.1.2         255.255.255.0      N/A (Router)      
+R2501B     GigabitEthernet0/2     172.16.3.1         255.255.255.0      N/A (Router)      
+R2501B     GigabitEthernet0/0     172.16.4.1         255.255.255.0      N/A (Router)      
+R2501C     GigabitEthernet0/0     172.16.4.2         255.255.255.0      N/A (Router)      
+R2621      GigabitEthernet0/0     172.16.2.2         255.255.255.0      N/A (Router)      
+PC         FastEthernet0          172.16.3.2         255.255.255.0      172.16.3.1        
+------------------------------------------------------------------------------
+
+2. PHYSICAL CABLING & PORT CONNECTIONS
+------------------------------------------------------------------------------
+From Device    From Port              To Device      To Port                Cable Type  
+------------------------------------------------------------------------------
+R2501B         GigabitEthernet0/0     R2501C         GigabitEthernet0/0     Cross-Over      
+R2501A         GigabitEthernet0/0     R2621          GigabitEthernet0/0     Cross-Over      
+R2501A         GigabitEthernet0/1     R2501B         GigabitEthernet0/1     Cross-Over      
+PC             FastEthernet0          R2501B         GigabitEthernet0/2     Cross-Over      
+------------------------------------------------------------------------------
+
+3. VLSM SUBNET ALLOCATION TABLE
+------------------------------------------------------------------------------
+Subnet (CIDR)        Netmask            Connected Routers    Connected PCs       
+------------------------------------------------------------------------------
+172.16.1.0/24        255.255.255.0      R2501A, R2501B       None                
+172.16.2.0/24        255.255.255.0      R2501A, R2621        None                
+172.16.3.0/24        255.255.255.0      R2501B               PC                  
+172.16.4.0/24        255.255.255.0      R2501B, R2501C       None                
+------------------------------------------------------------------------------
+
+4. ROUTING CONFIGURATION
+------------------------------------------------------------------------------
+Protocol: RIPv2 (version 2, no auto-summary)
+
+[Router R2501A]
+  network 172.16.0.0
+
+[Router R2501B]
+  network 172.16.0.0
+
+[Router R2501C]
+  network 172.16.0.0
+
+[Router R2621]
+  network 172.16.0.0
+------------------------------------------------------------------------------
+
+5. STEP-BY-STEP TESTING & VERIFICATION GUIDE IN PACKET TRACER
+------------------------------------------------------------------------------
+1. Open the .pkt file in Cisco Packet Tracer.
+2. CRITICAL - BYPASS INITIAL CONVERGENCE:
+   - When Packet Tracer first opens, switch ports take 30-50s to transition from STP listening
+     to forwarding (amber dots turn green), and OSPF routers take ~40s to elect DR/BDR.
+   - Click the 'Fast Forward Time' button (>>) in the bottom toolbar 2 to 3 times (or press Alt+D).
+   - Verify all link lights turn solid green.
+3. TESTING CONNECTIVITY:
+   - Click on any PC (e.g. PC1) -> 'Desktop' tab -> 'Command Prompt'.
+==============================================================================

@@ -128,6 +128,7 @@ def generate_switch_ios_config(switch_name: str) -> List[str]:
         "!",
         "spanning-tree mode pvst",
         "spanning-tree extend system-id",
+        "spanning-tree portfast default",
         "!",
         "interface Vlan1",
         " no ip address",
